@@ -424,17 +424,17 @@ end subroutine
 !
 subroutine EraseftlListIteratorPair(self, first, last) !从first到last-1删除元素
 	class(ftlList) , intent(inout) :: self
-	type(ftlListIterator) :: first !注意调用结束后first已改变
+	type(ftlListIterator), intent(in) :: first !修改
 	type(ftlListIterator), intent(in) :: last
-	type(ftlListIterator) :: deletor
+	type(ftlListIterator) :: walker, deletor !修改
 
-	associate(walker => first) !walker是first的别名
-		do while (walker /= last)
-			deletor = walker
-			call walker%Inc() !下一个节点
-			call self%EraseSingle(deletor) !删除deletor节点
-		enddo
-	end associate
+	walker = first !修改
+
+	do while (walker /= last)
+		deletor = walker
+		call walker%Inc() !下一个节点
+		call self%EraseSingle(deletor) !删除deletor节点
+	enddo
 end subroutine
 !交换链表 模块方法
 subroutine SwapList(self, other)
@@ -666,7 +666,7 @@ end subroutine WriteList
 !查找索引元素值 只能用call WriteNode(o%Get(7))显示
 function Get(self, index) result(value)
 	class(ftlList), intent(in) :: self
-	integer, intent(in)   :: index  !位置序号
+	integer, intent(in) :: index  !位置序号
 	type(ftlListIterator) :: it
 	class(*), allocatable :: value
 
@@ -676,7 +676,7 @@ end function Get
 !更改索引元素值
 subroutine Change(self, index, value)
 	class(ftlList), intent(inout) :: self
-	integer, intent(in)  :: index
+	integer, intent(in) :: index
 	class(*), intent(in) :: value
 	type(ftlListIterator) :: it
 
@@ -692,7 +692,7 @@ end subroutine Change
 !索引位置前插入新元素
 subroutine InsertVal(self, index, value)
 	class(ftlList), intent(inout) :: self
-	integer, intent(in)  :: index !位置序号
+	integer, intent(in) :: index !位置序号
 	class(*), intent(in) :: value
 	type(ftlListIterator) :: it
 
@@ -702,7 +702,7 @@ end subroutine InsertVal
 !索引位置删除元素
 subroutine EraseVal(self, index)
 	class(ftlList), intent(inout) :: self
-	integer, intent(in)  :: index !位置序号
+	integer, intent(in) :: index !位置序号
 	type(ftlListIterator) :: it
 
 	it=self%FindIt(index) !第index个元素的迭代器
@@ -711,7 +711,7 @@ end subroutine EraseVal
 !返回第index个元素的迭代器 self%FindIt(1)等价于self%Begin()
 type(ftlListIterator) function FindIt(self, index)  !迭代器
 	class(ftlList), intent(in) :: self
-	integer, intent(in)  :: index !位置序号
+	integer, intent(in) :: index !位置序号
 	integer :: i
 
 	if (index>self%psize .or. index<1) then
@@ -789,20 +789,20 @@ pure function GetFront(self) result(value)
 	class(ftlList), intent(in) :: self
 	class(*), allocatable :: value
 
-	value=self%front
+	if(associated(self%front))value=self%front
 end function GetFront
 !增加实例方法 返回尾值
 pure function GetBack(self) result(value)
 	class(ftlList), intent(in) :: self
 	class(*), allocatable :: value
 
-	value=self%back
+	if(associated(self%back))value=self%back
 end function GetBack
 !增加实例方法 返回迭代器对应节点元素数据
 pure function GetValue(self) result(value)
 	class(ftlListIterator), intent(in) :: self
 	class(*), allocatable :: value
 
-	value=self%value
+	if(associated(self%value))value=self%value
 end function GetValue
 end module
