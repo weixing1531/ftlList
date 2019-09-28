@@ -1,3 +1,20 @@
+! Copyright (c) 2016, 2017  Robert Rüger
+!
+! This file is part of of the Fortran Template Library.
+!
+! The Fortran Template Library is free software: you can redistribute it and/or
+! modify it under the terms of the GNU Lesser General Public License as
+! published by the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+!
+! The Fortran Template Library is distributed in the hope that it will be
+! useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+! General Public License for more details.
+!
+! You should have received a copy of the GNU Lesser General Public License along
+! with the Fortran Template Library.  If not, see <http://www.gnu.org/licenses/>.
+
 module ftlSingleListMod
 	use, intrinsic :: iso_fortran_env, only: OUTPUT_UNIT
 	implicit none
@@ -54,7 +71,7 @@ module ftlSingleListMod
 		procedure :: InsertArray
 		procedure :: InsertftlSingleListIteratorPair
 		procedure :: InsertVal !新增方法 按照序号前插元素
-		generic , public :: Insert => InsertSingle, InsertFill, InsertArray, InsertftlSingleListIteratorPair, InsertVal !向前插入链表元素
+		generic , public :: Insert => InsertSingle, InsertFill, InsertArray, InsertftlSingleListIteratorPair, InsertVal !只有InsertVal前插 其余为后插
 
 		procedure :: EraseSingle
 		procedure :: EraseftlSingleListIteratorPair
@@ -64,7 +81,6 @@ module ftlSingleListMod
 		procedure, public :: PushFront !链表头部压入新元素
 		procedure, public :: PopFront  !链表头部压出元素
 		procedure, public :: PushBack  !链表尾部压入新元素
-		!procedure, public :: PopBack   !链表尾部压出元素 由于数据节点没有前指针
 
 		procedure, public :: Resize !调整链表元素个数
 		procedure, public :: Clear  !清除链表所有节点
@@ -389,8 +405,8 @@ subroutine EraseSingle(self, position)
 	type(ftlSingleListIterator) :: position
 	class(ListNode), pointer :: temp !新增
 
-	temp => position%node%next !新增
-	position%node%next => temp%next !新增
+	temp => position%node%next !新增 要被删除的节点
+	position%node%next => temp%next !新增 断开被删除的节点
 
 	if(associated(temp,self%sentinel%prev))self%sentinel%prev => position%node !temp为尾节点 新增
 	deallocate(temp) !释放该节点内存 新增
@@ -400,20 +416,17 @@ end subroutine
 !
 subroutine EraseftlSingleListIteratorPair(self, first, last) !从first+1到last-1删除元素
 	class(ftlSingleList) , intent(inout) :: self
-	type(ftlSingleListIterator) :: first !注意调用结束后first已改变
+	type(ftlSingleListIterator), intent(in) :: first !修改
 	type(ftlSingleListIterator), intent(in) :: last
-	type(ftlSingleListIterator) :: deletor
+	type(ftlSingleListIterator) :: walker !修改
 
-	deletor=first !修改 deletor位置是固定的
+	walker = first !新增
+	call walker%Inc() !下一个节点 新增  这里处理与双向链表不同
 
-	associate(walker => first) !walker是first的别名
-		call walker%Inc() !下一个节点 新增  这里处理与双向链表不同
-
-		do while (walker /= last)
-			call walker%Inc() !下一个节点
-			call self%EraseSingle(deletor) !删除deletor节点
-		enddo
-	end associate
+	do while (walker /= last)
+		call walker%Inc() !下一个节点
+		call self%EraseSingle(first) !总是删除first的下一节点
+	enddo
 end subroutine
 !交换链表 模块方法
 subroutine SwapList(self, other)
@@ -622,7 +635,7 @@ end subroutine WriteList
 !查找索引元素值 只能用call WriteNode(o%Get(7))显示
 function Get(self, index) result(value)
 	class(ftlSingleList), intent(in) :: self
-	integer, intent(in)   :: index  !位置序号
+	integer, intent(in) :: index  !位置序号
 	type(ftlSingleListIterator) :: it
 	class(*), allocatable :: value
 
@@ -632,7 +645,7 @@ end function Get
 !更改索引元素值
 subroutine Change(self, index, value)
 	class(ftlSingleList), intent(inout) :: self
-	integer, intent(in)  :: index
+	integer, intent(in) :: index
 	class(*), intent(in) :: value
 	type(ftlSingleListIterator) :: it
 
@@ -648,7 +661,7 @@ end subroutine Change
 !索引位置前插入新元素
 subroutine InsertVal(self, index, value)
 	class(ftlSingleList), intent(inout) :: self
-	integer, intent(in)  :: index !位置序号
+	integer, intent(in) :: index !位置序号
 	class(*), intent(in) :: value
 	type(ftlSingleListIterator) :: it
 
@@ -658,7 +671,7 @@ end subroutine InsertVal
 !索引位置删除元素
 subroutine EraseVal(self, index)
 	class(ftlSingleList), intent(inout) :: self
-	integer, intent(in)  :: index !位置序号
+	integer, intent(in) :: index !位置序号
 	type(ftlSingleListIterator) :: it
 
 	it=self%FindIt(index,.true.) !第index个元素前一个位置的迭代器
@@ -667,18 +680,25 @@ end subroutine EraseVal
 !返回第index个元素前一个位置的迭代器 self%FindIt(2)等价于self%Begin()
 type(ftlSingleListIterator) function FindIt(self, index, IsBefore)  !迭代器
 	class(ftlSingleList), intent(in) :: self
-	integer, intent(in)  :: index !位置序号
-	logical, optional, intent(in)  :: IsBefore !真为第index个元素前一位置 假为当前位置 新增
+	integer, intent(in) :: index !位置序号
+	logical, optional, intent(in) :: IsBefore !真为第index个元素前一位置 假为当前位置 新增
 	integer :: i
 
 	if (index>self%psize .or. index<1) then
 		stop "Index is not in range [1,psize]."
 	end if
 	!只能从头开始搜索
-	if(present(IsBefore) .and. IsBefore)then
-		FindIt=self%End()   !哨兵节点 修改 函数返回前一位置
-	else
-		FindIt=self%Begin() !头节点 修改 函数返回当前位置
+	FindIt=self%End()   !哨兵节点 修改 函数返回前一位置
+
+	if(present(IsBefore) .and. IsBefore)then !函数返回前一位置
+
+	else !函数返回当前位置
+		if(index==self%psize)then !尾节点
+			call FindIt%Dec() !上一节点 哨兵节点转到尾节点
+			return
+		end if
+
+		call FindIt%Inc() !下一节点即头节点 修改 函数返回当前位置
 	end if
 
 	do i=1,index-1 !循环index-1次
@@ -742,20 +762,20 @@ pure function GetFront(self) result(value)
 	class(ftlSingleList), intent(in) :: self
 	class(*), allocatable :: value
 
-	value=self%front
+	if(associated(self%front))value=self%front
 end function GetFront
 !增加实例方法 返回尾值
 pure function GetBack(self) result(value)
 	class(ftlSingleList), intent(in) :: self
 	class(*), allocatable :: value
 
-	value=self%back
+	if(associated(self%back))value=self%back
 end function GetBack
 !增加实例方法 返回迭代器对应节点元素数据
 pure function GetValue(self) result(value)
 	class(ftlSingleListIterator), intent(in) :: self
 	class(*), allocatable :: value
 
-	value=self%value
+	if(associated(self%value))value=self%value
 end function GetValue
 end module

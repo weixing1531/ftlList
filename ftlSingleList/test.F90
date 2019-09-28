@@ -84,5 +84,11 @@ program main
 	it=o%FindIt(5) !链表哨兵节点
 	call WriteNode(it%GetValue(),"Node") !打印节点元素
 
+	it=o%End() !链表哨兵节点
+	call it%Dec() !上一节点即尾节点
+
+	call o%Erase(o%Begin(),it)
+	call o%WriteList() !打印链表
+
 	read(*,*)
 end program
